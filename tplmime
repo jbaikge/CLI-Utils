@@ -1,0 +1,70 @@
+#!/usr/bin/php
+<?php
+
+$filename = '/usr/share/mime/packages/freedesktop.org.xml';
+$backup = tempnam('/tmp', 'mime');
+
+copy($filename, $backup);
+printf("Backed up %s to %s\n", $filename, $backup);
+
+$dom = new DOMDocument();
+$dom->load($filename);
+
+$xpath = new DOMXpath($dom);
+$xpath->registerNamespace('mime', 'http://www.freedesktop.org/standards/shared-mime-info');
+
+$php_nodes = $xpath->evaluate('/mime:mime-info/mime:mime-type[@type="application/x-php"]');
+if ($php_nodes->length == 0) {
+	echo "Could not find PHP node\n";
+	exit(1);
+}
+
+$php_node = $php_nodes->item(0);
+
+if ($xpath->evaluate('mime:glob[@pattern="*.tpl"]')->length == 0) {
+	$glob = $dom->createElement('glob');
+	$glob->setAttribute('pattern', '*.tpl');
+	$php_node->appendChild($glob);
+	system('update-mime-database /usr/share/mime');
+	echo "Enabled tpl support.\n";
+} else {
+	echo "tpl support already enabled.\n";
+}
+
+$dom->save($filename);
+
+/*
+import os
+import shutil
+import sys
+import xml.dom.minidom
+from xml import xpath
+
+filename = "/usr/share/mime/packages/freedesktop.org.xml"
+backup = os.tmpnam()
+
+shutil.copy(filename, backup)
+print "Backed up %s to %s" % (filename, backup)
+
+doc = xml.dom.minidom.parse(backup)
+php_nodes = xpath.Evaluate('//mime-type', doc.documentElement)
+
+print php_nodes
+
+'''
+doc = libxml2.parseFile(backup)
+context = doc.xpathNewContext()
+php_nodes = context.xpathEval("//mime-type")
+
+print php_nodes
+
+if len(php_nodes) == 0:
+	print "Could not find PHP MIME node."
+	sys.exit(1)
+
+php_node = php_nodes[0]
+
+context.xpathFreeContext()
+doc.freeDoc()
+'''
+*/
