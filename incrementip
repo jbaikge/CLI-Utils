@@ -1,0 +1,22 @@
+#!/usr/bin/awk -f 
+BEGIN {
+	FS="."
+	OFS="."
+	if (ARGV[1] == "") {
+		printf("USAGE: %s ipaddress\n", ARGV[0]) > "/dev/stderr"
+		exit 1
+	}
+	split(ARGV[1], IPBITS)
+	if (IPBITS[1] + IPBITS[2] + IPBITS[3] + IPBITS[4] == 255 * 4) {
+		printf("IP [%s] too large to increment\n", ARGV[1]) > "/dev/stderr"
+		exit 1
+	}
+	for (i = 4; i >= 1; i--) {
+		++IPBITS[i]
+		if (IPBITS[i] > 255)
+			IPBITS[i] = 0
+		else
+			break
+	}
+	print IPBITS[1], IPBITS[2], IPBITS[3], IPBITS[4]
+}
