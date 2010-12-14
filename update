@@ -1,0 +1,17 @@
+#!/bin/sh
+if [ -z $1 ]; then
+	echo "USAGE: $0 server [revision]"
+	exit 1
+fi
+
+SERVER=$1
+REVISION=$2
+
+COMMAND="svn info public_html | grep Revision | sed 's/Revision/Previous Revision/';echo"
+if [ -z $2 ]; then
+	COMMAND="${COMMAND};svn up public_html"
+else
+	COMMAND="${COMMAND};svn up -r ${REVISION} public_html"
+fi
+
+ssh ${SERVER} "${COMMAND}"
