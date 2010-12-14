@@ -1,0 +1,169 @@
+#!/bin/bash
+# Binary paths
+SVN=/usr/bin/svn
+
+# Flags
+AUTO_SWITCH=0
+NO_PROMPT=0
+VERBOSE=0
+RELEASE=2
+REPOS=
+
+function usage () {
+	cat <<-USAGE
+		USAGE: $0 [options] [repos] [type]
+		OPTIONS:
+		  -h     Print this message
+		  -n     Do not prompt for commit message and use a default message
+		  -s     Automatically switch to newly created tag
+		  -v     Verbose
+		REPOS:
+		  URL    This is the path to the repository to release the new tag. If none
+		         is specified, the path will be derived from the current working copy.
+		TYPE:
+		  major  Increment the major digit
+		  minor  Increment the minor digit
+		  maint  Increment the maintenance digit (default)
+	USAGE
+	exit
+}
+
+function debug () {
+	if [ "$VERBOSE" -eq 0 ]
+	then
+		return 0
+	fi
+	echo "$1"
+}
+
+# Determine what options to set
+for ARG in $@
+do
+	case "$ARG" in
+	-h | --help)
+		usage;;
+	-n | --no-prompt)
+		NO_PROMPT=1;;
+	-s | --switch)
+		AUTO_SWITCH=1;;
+	-v | --verbose)
+		VERBOSE=1;;
+	major)
+		RELEASE=0;;
+	minor)
+		RELEASE=1;;
+	maint)
+		RELEASE=2;;
+	*)
+		substr=${ARG:0:4}
+		if [ "$substr" == "svn:" ] || [ "$substr" == "http" ] || [ "$substr" == "file" ]
+		then
+			REPOS=$ARG
+		fi
+	esac
+done
+
+# If we don't have a value for REPOS, first see if we have a .svn directory. If
+# we do, we know we can at least attempt to gather information about where we
+# are and what to do.
+if [ -z "$REPOS" ] && [ ! -d .svn ]
+then
+	echo "Current directory is not a working copy. Cannot determine repository URL." > /dev/stderr
+	exit 1
+elif [ -z "$REPOS" ]
+then
+	debug "Attempting to determine repository URL"
+	REPOS=`$SVN info | awk '/Repository Root/ {print $NF}'`
+	# If it's still empty here, then something ridiculous is going on
+	if [ -z "$REPOS" ]
+	then
+		echo "There was a problem deriving the repository URL from the working copy." > /dev/stderr
+		exit 1
+	fi
+fi
+
+# Quick commercial break..
+debug "These are the settings that will be used:"
+debug "  Do not prompt:        $NO_PROMPT"
+debug "  Automatically switch: $AUTO_SWITCH"
+debug "  Verbose:              $VERBOSE"
+debug "  Release type:         $RELEASE"
+debug "  Repository:           $REPOS"
+
+REPOS_TRUNK=$REPOS/trunk
+REPOS_TAGS=$REPOS/tags
+
+# Determine current latest version. If there is no version, then make the new
+# one 1.0.0.
+LAST_VERSION=`$SVN ls $REPOS_TAGS | awk 'BEGIN {FS="."} {sub("/$", ""); printf("%03d%03d%03d %s\n", $1, $2, $3, $0)}' | sort | cut -d' ' -f2 | tail -n1`
+if [ -z "$LAST_VERSION" ]
+then
+	LAST_VERSION=0.0.0
+	RELEASE=0
+fi
+
+# Increment the version based on the value of RELEASE.
+VERSION_BITS=(`echo $LAST_VERSION | sed 's/\./ /g'`)
+debug "Old version information:"
+debug "  Major: ${VERSION_BITS[0]}"
+debug "  Minor: ${VERSION_BITS[1]}"
+debug "  Maint: ${VERSION_BITS[2]}"
+let ++VERSION_BITS[$RELEASE]
+if [ "$RELEASE" -lt 1 ]
+then
+	VERSION_BITS[1]=0
+fi
+if [ "$RELEASE" -lt 2 ]
+then
+	VERSION_BITS[2]=0
+fi
+NEW_VERSION=${VERSION_BITS[0]}.${VERSION_BITS[1]}.${VERSION_BITS[2]}
+debug "New version: $NEW_VERSION"
+
+# Perform the copy from the trunk to the new version. If NO_PROMPT is set, fill
+# the message with a generic message and a list of modified files.
+if [ "$NO_PROMPT" -eq 1 ]
+then
+	TMP_COMMIT_MSG=$(mktemp -t svn-commit.XXX)
+	debug "Created tmp file for commit message: $TMP_COMMIT_MSG"
+	echo Releasing version $NEW_VERSION. > $TMP_COMMIT_MSG
+	if [ "$NEW_VERSION" == "1.0.0" ]
+	then
+		echo " * Initial release" >> $TMP_COMMIT_MSG
+	else
+		echo Changed files: >> $TMP_COMMIT_MSG
+		$SVN diff --summarize $REPOS_TAGS/$LAST_VERSION $REPOS_TRUNK | sed -e "s#$REPOS_TAGS/$LAST_VERSION##" >> $TMP_COMMIT_MSG
+	fi
+	debug "Wrote commit message, copying from trunk to new tag"
+	$SVN cp -F"$TMP_COMMIT_MSG" $REPOS_TRUNK $REPOS_TAGS/$NEW_VERSION > /dev/null
+else
+	debug "Asking user for a commit message"
+	$SVN cp $REPOS_TRUNK $REPOS_TAGS/$NEW_VERSION
+fi
+
+# Let the user know something happened.
+echo
+echo Released version: $NEW_VERSION
+
+# Switch to the new version based on the value of AUTO_SWITCH.
+if [ "$AUTO_SWITCH" -eq 1 ]
+then
+	debug "Performing checks before auto-switching"
+	# Quick check to see if we're inside a working copy
+	$SVN info &> /dev/null
+	if [ $? -ne 0 ]
+	then
+		echo Not inside a working copy. Cancelling auto-switch. > /dev/stderr
+		exit 1
+	fi
+	debug "  Working copy check passed"
+	# Make sure we're not nested within a tag or something ridiculous
+	VALID_LOCATION=$(svn info | awk '/URL:/ && ($NF ~ /trunk$/ || $NF ~ /[0-9]\.[0-9]+\.[0-9]$/) { print 1 }')
+	if [ -z "$VALID_LOCATION" ]
+	then
+		echo Not within the trunk or an existing tag. Taking the cautious route and cancelling auto-switch. > /dev/stderr
+		exit 1
+	fi
+	debug "  Valid location check passed"
+	$SVN sw $REPOS_TAGS/$NEW_VERSION
+fi
