@@ -1,0 +1,24 @@
+#!/bin/bash
+INCREMENTIP=/home/jake/bin/incrementip
+SSLTEMPLATE=/usr/share/ssl-cert/ssleay.cnf
+
+if [ -z $1 ]; then
+	echo Usage: $0 DOMAIN
+	exit 1
+fi
+echo Adding $1 ...
+
+# Get a new IP
+SITEIP=`awk '/^127.0.1/ {print $1}' /etc/hosts | tail -n1 | xargs $INCREMENTIP`
+
+# Create a temporary config for SSL
+TMPCONF=/tmp/ssl.`date +%s`.cnf
+sed 's/@HostName@/sable.'$1'/' $SSLTEMPLATE > $TMPCONF
+
+# Run the root commands
+su -c "echo Use VHost $1 >> /etc/apache2/sites-available/svn-sites; \
+echo $SITEIP sable.$1 >> /etc/hosts; \
+make-ssl-cert $TMPCONF /etc/apache2/ssl/$1.pem
+apache2ctl restart"
+
+echo Done.
