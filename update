@@ -24,4 +24,4 @@ CURRENT_REVISION=`ssh ${SERVER} "${FETCH_REVISION}"`
 echo "Previous Revision: $PREVIOUS_REVISION"
 echo "Current Revision:  $CURRENT_REVISION"
 
-echo "http://traffic.okco.com/update-notify.php?user=`whoami`&server=${SERVER}&previous=${PREVIOUS_REVISION}&current=${CURRENT_REVISION}"
+/usr/bin/curl -s "http://traffic.okco.com/update-notify.php?user=`whoami`&server=${SERVER}&previous=${PREVIOUS_REVISION}&current=${CURRENT_REVISION}"
