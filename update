@@ -7,11 +7,21 @@ fi
 SERVER=$1
 REVISION=$2
 
-COMMAND="svn info public_html | grep Revision | sed 's/Revision/Previous Revision/';echo"
+FETCH_REVISION="svn info public_html | grep Revision | sed 's/Revision: //'"
+
+PREVIOUS_REVISION=`ssh ${SERVER} "${FETCH_REVISION}"`
+
 if [ -z $2 ]; then
-	COMMAND="${COMMAND};svn up public_html"
+	COMMAND="svn up public_html"
 else
-	COMMAND="${COMMAND};svn up -r ${REVISION} public_html"
+	COMMAND="svn up -r ${REVISION} public_html"
 fi
 
 ssh ${SERVER} "${COMMAND}"
+
+CURRENT_REVISION=`ssh ${SERVER} "${FETCH_REVISION}"`
+
+echo "Previous Revision: $PREVIOUS_REVISION"
+echo "Current Revision:  $CURRENT_REVISION"
+
+echo "http://traffic.okco.com/update-notify.php?user=`whoami`&server=${SERVER}&previous=${PREVIOUS_REVISION}&current=${CURRENT_REVISION}"
