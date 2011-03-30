@@ -1,0 +1,10 @@
+#!/bin/bash
+TARGET=$1
+REPO_ROOT=$(svn info "$TARGET" | awk '/Repository Root/ {print $NF}')
+
+if [ -z $REPO_ROOT ]; then
+	echo Not an svn directory.
+	exit 1
+fi
+
+svn ls "$REPO_ROOT/branches" | sed 's#^#'$REPO_ROOT'/branches/#'
