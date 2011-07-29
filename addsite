@@ -16,7 +16,7 @@ TMPCONF=/tmp/ssl.`date +%s`.cnf
 sed 's/@HostName@/sable.'$1'/' $SSLTEMPLATE > $TMPCONF
 
 # Run the root commands
-su -c "echo Use VHost $1 >> /etc/apache2/sites-available/svn-sites; \
+su -c "echo Use SvnHost $1 >> /etc/apache2/sites-enabled/sites; \
 echo $SITEIP sable.$1 >> /etc/hosts; \
 make-ssl-cert $TMPCONF /etc/apache2/ssl/$1.pem
 apache2ctl restart"
