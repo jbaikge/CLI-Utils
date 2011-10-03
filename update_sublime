@@ -3,11 +3,12 @@ URL=http://www.sublimetext.com
 UPDATEURL=$URL/updates/2/dev/updatecheck
 NEWVERSION=$(curl -s $UPDATEURL | grep latest_version | egrep -o '[0-9]+')
 FILENAME=$(printf "Sublime Text 2 Build %d x64.tar.bz2" $NEWVERSION)
+NEWURL=http://c758482.r82.cf2.rackcdn.com/$FILENAME
 SAVEDIR=~/Downloads
 BINDIR=~/Downloads
 
 if [ ! -f "$SAVEDIR/$FILENAME" ]; then
-	wget "$URL/$FILENAME" -O "$SAVEDIR/$FILENAME"
+	wget "$NEWURL" -O "$SAVEDIR/$FILENAME"
 	rm -rf "$BINDIR/Sublime Text 2"
 	tar jxvf "$SAVEDIR/$FILENAME" -C "$BINDIR"
 fi
