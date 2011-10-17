@@ -1,37 +1,31 @@
 #!/usr/bin/php
 <?php
-$buffer = array();
 $fh = fopen('php://stdin', 'r');
 
-$message_keys = array('execution_time', 'server_name', 'uri', 'memory_usage');
-$error_keys = array('line', 'file', 'message', 'type', 'level', 'color');
-
-$error_key = null;
-
 $colors = array(
-	'black' => '\e[30m',
-	'red' => '\e[31m',
-	'green' => '\e[32m',
-	'yellow' => '\e[33m',
-	'blue' => '\e[34m',
-	'magenta' => '\e[35m',
-	'cyan' => '\e[36m',
-	'white' => '\e[37m',
-	'black_bold' => '\e[1;30m',
-	'red_bold' => '\e[1;31m',
-	'green_bold' => '\e[1;32m',
-	'yellow_bold' => '\e[1;33m',
-	'blue_bold' => '\e[1;34m',
+	'black'        => '\e[30m',
+	'red'          => '\e[31m',
+	'green'        => '\e[32m',
+	'yellow'       => '\e[33m',
+	'blue'         => '\e[34m',
+	'magenta'      => '\e[35m',
+	'cyan'         => '\e[36m',
+	'white'        => '\e[37m',
+	'black_bold'   => '\e[1;30m',
+	'red_bold'     => '\e[1;31m',
+	'green_bold'   => '\e[1;32m',
+	'yellow_bold'  => '\e[1;33m',
+	'blue_bold'    => '\e[1;34m',
 	'magenta_bold' => '\e[1;35m',
-	'cyan_bold' => '\e[1;36m',
-	'white_bold' => '\e[1;37m',
-	'reset' => '\e[0m'
+	'cyan_bold'    => '\e[1;36m',
+	'white_bold'   => '\e[1;37m',
+	'reset'        => '\e[0m'
 );
 
 $color_map = array(
 	'red' => 'red',
 	'orange' => 'yellow',
-	'blue' => 'blue'
+	'blue' => 'cyan'
 );
 
 function colorf () {
@@ -41,58 +35,38 @@ function colorf () {
 	passthru('/bin/echo -e "' . vsprintf($strf, $args) . $colors['reset'] . '"');
 }
 
+/*
 foreach ($colors as $name => $code) {
 	passthru('/bin/echo -e "' . sprintf("%s%s%s", $code, $name, $colors['reset']) . '"');
 }
+*/
 
-while ($line = fgets($fh)) {
-	// Determine if a new message has come through:
-	if (preg_match('#^\d+/\d+/\d+ \d+:\d+:\d+ New Message:#', $line)) {
-		$buffer = array(
-			'timestamp' => substr($line, 0, 19),
-			'messages' => array()
-		);
-		$error_key = null;
-		$required_keys = $message_keys;
+while ($json = fgets($fh)) {
+	$package = json_decode($json, true);
+	if (json_last_error() != JSON_ERROR_NONE) {
+		echo "no clude\n";
+		continue;
 	}
+	$date = new DateTime();
+	$date->setTimestamp($package['timestamp'] / 1e9);
+	$stamp = '[' . $date->format('Hmi') . ']';
+	$indent = str_repeat(' ', strlen($stamp) + 1);
 
-	// Absorb Main Items
-	if (strpos($line, "\t") === 0) {
-		list($key, $value) = array_map('trim', explode(':', $line, 2));
-		// Error component:
-		if ($line[2] == "\t") {
-			$buffer['messages'][$error_key][$key] = $value;
-		}
-		// Error message ID:
-		else if ($line[1] == "\t") {
-			$error_key = $key;
-			$required_keys = array_merge($message_keys, array('messages'));
-		}
-		// Main component:
-		else if ($line[0] == "\t" && $key != 'messages') {
-			$buffer[$key] = $value;
-		}
-	}
+	colorf("%s%s %s%s",
+		$colors['green_bold'],
+		$stamp,
+		$package['data']['server_name'],
+		$package['data']['uri']
+	);
+	colorf("%s%sTime: %0.4fs Memory: %0.4fM",
+		$colors['green'],
+		$indent,
+		$package['data']['execution_time'],
+		$package['data']['memory_usage'] / 1024 / 1024
+	);
 
-	if (count(array_diff($required_keys, array_keys($buffer))) == 0) {
-		$date = new DateTime($buffer['timestamp']);
-		$stamp = '[' . $date->format('Hmi') . ']';
-		$indent = str_repeat(' ', strlen($stamp) + 1);
-
-		colorf("%s%s %s%s",
-			$colors['cyan_bold'],
-			$stamp,
-			$buffer['server_name'],
-			$buffer['uri']
-		);
-		colorf("%s%sTime: %0.4fs Memory: %0.4fM",
-			$colors['cyan'],
-			$indent,
-			$buffer['execution_time'],
-			$buffer['memory_usage'] / 1024 / 1024
-		);
-
-		foreach ($buffer['messages'] as $error) {
+	if (array_key_exists('messages', $package['data'])) {
+		foreach ($package['data']['messages'] as $error) {
 			list($junk, $path) = explode('httpdocs', $error['file']);
 			colorf("%s%s%s: %s:%d\n%s    %s",
 				$colors[$color_map[$error['color']]],
@@ -106,27 +80,3 @@ while ($line = fgets($fh)) {
 		}
 	}
 }
-
-/*
-2011/10/15 14:58:30 New Message: 
-1318705110323687245<Website Origin>:
-	execution_time: 0.023900985717773
-	server_name: squeaker.expresslanes.com
-	uri: /admin/add/slidedeckPanel/95
-	messages: 
-		be2c69acfe20573917cb34a52ea828681f4de277: 
-			line: 69
-			file: /home/jake/svn/expresslanes.com/httpdocs/lib/framework/template/FTemplate.class.php
-			message: Could not retrieve template: templates/forms/form-slidedeckPanel.html.php
-			type: error
-			level: User Warning
-			color: orange
-	memory_usage: 2.176168e+06
-2011/10/15 15:09:01 New Message: 
-1318705741727736207<Website Origin>:
-	execution_time: 0.0064380168914795
-	server_name: squeaker.expresslanes.com
-	uri: /admin/list/slidedeck
-	memory_usage: 2.135392e+06
-
-*/
