@@ -1,0 +1,97 @@
+#!/usr/bin/php
+<?php
+/**
+ * Chmods every directory within directories.writeable as well as the cache
+ * directory.
+ */
+function chmod_dirs (array $config) {
+	$dirs = array_merge(
+		array($config['cache.dir']),
+		$config['directories.writeable']
+	);
+	foreach ($dirs as $dir) {
+		chmod($dir, 0777);
+	}
+}
+/**
+ * Creates the database if it does not exist.
+ */
+function create_database (array $config) {
+	$conn = mysql_connect($config['database.host'], $config['database.user'], $config['database.pass']);
+	mysql_query("CREATE DATABASE IF NOT EXISTS `" . $config['database.name'] . "`", $conn);
+	mysql_close($conn);
+}
+/**
+ * Searches the entire heirarchy for the webroot.conf.php file. Will look inside
+ * each directory in the heirarchy as well as any httpdocs directory within each
+ * directory.
+ */
+function find_webroot ($dir) {
+	if (!is_dir($dir)) {
+		$dir = dirname($dir);
+	}
+
+	$check_subdirs = array('.', 'httpdocs');
+	$last_dir = null;
+
+	while ($dir != $last_dir) {
+		$last_dir = $dir;
+		foreach ($check_subdirs as $subdir) {
+			$path_bits = array($dir, $subdir, 'webroot.conf.php');
+			$path = implode(DIRECTORY_SEPARATOR, $path_bits);
+			$file = realpath($path);
+			if (file_exists($file)) {
+				return $file;
+			}
+		}
+		$dir = dirname($dir);
+	}
+}
+/**
+ * As of October 25, 2011, when you run the webroot directly from the command
+ * line, it returns the config variables as a block of JSON.
+ */
+function get_config ($webroot) {
+	$json = '';
+	$ph = popen('php -f ' . escapeshellarg($webroot), 'r');
+	while ($buf = fread($ph, 1024)) {
+		$json .= $buf;
+	}
+	pclose($ph);
+	$config = json_decode($json, true);
+	return $config;
+}
+/**
+ * Creates any missing directories from:
+ * * cache directory
+ * * writable directories
+ * * private directories
+ */
+function make_missing_dirs (array $config) {
+	$dirs = array_merge(
+		array($config['cache.dir']),
+		$config['directories.writeable'],
+		$config['directories.private']
+	);
+	foreach ($dirs as $dir) {
+		if (!is_dir($dir)) {
+			mkdir($dir);
+		}
+	}
+	chmod_dirs($config);
+}
+
+// MAIN
+$current_dir = getcwd();
+$webroot = find_webroot($current_dir);
+
+// Error Check:
+if ($webroot == null) {
+	echo "Could not find webroot.conf.php. Are you sure this is a framework'd site?" . PHP_EOL;
+	exit(1);
+}
+
+$config = get_config($webroot);
+
+make_missing_dirs($config);
+create_database($config);
