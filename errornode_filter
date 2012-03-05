@@ -25,7 +25,8 @@ $colors = array(
 $color_map = array(
 	'red' => 'red',
 	'orange' => 'yellow',
-	'blue' => 'cyan'
+	'blue' => 'cyan',
+	'green' => 'green'
 );
 
 function colorf () {
@@ -52,10 +53,15 @@ while ($json = fgets($fh)) {
 	$stamp = '[' . $date->format('Hmi') . ']';
 	$indent = str_repeat(' ', strlen($stamp) + 1);
 
+	$server_name = $package['data']['server_name'];
+	if ($server_name == 'CLI') {
+		$server_name .= ' ';
+	}
+
 	colorf("%s%s %s%s",
 		$colors['green_bold'],
 		$stamp,
-		$package['data']['server_name'],
+		$server_name,
 		$package['data']['uri']
 	);
 	colorf("%s%sTime: %0.4fs Memory: %0.4fM",
