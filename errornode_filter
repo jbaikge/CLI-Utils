@@ -50,7 +50,7 @@ while ($json = fgets($fh)) {
 	}
 	$date = new DateTime();
 	$date->setTimestamp($package['timestamp'] / 1e9);
-	$stamp = '[' . $date->format('Hmi') . ']';
+	$stamp = '[' . $date->format('His') . ']';
 	$indent = str_repeat(' ', strlen($stamp) + 1);
 
 	$server_name = $package['data']['server_name'];
@@ -73,16 +73,46 @@ while ($json = fgets($fh)) {
 
 	if (array_key_exists('messages', $package['data'])) {
 		foreach ($package['data']['messages'] as $error) {
-			list($junk, $path) = explode('httpdocs', $error['file']);
-			colorf("%s%s%s: %s:%d\n%s    %s",
-				$colors[$color_map[$error['color']]],
-				$indent,
-				$error['level'],
-				$path,
-				$error['line'],
-				$indent,
-				$error['message']
-			);
+			if (!isset($error['file'], $error['level'], $error['line'], $error['color'])) {
+				print_custom($error);
+			} else {
+				print_error($error);
+			}
 		}
+	}
+}
+
+function print_error($error) {
+	global $colors, $color_map, $indent;
+	if (strpos($error['file'], 'httpdocs') !== false) {
+		list($junk, $path) = explode('httpdocs', $error['file']);
+	} else {
+		$path = $error['file'];
+	}
+	colorf("%s%s%s: %s:%d\n%s    %s",
+		$colors[$color_map[$error['color']]],
+		$indent,
+		$error['level'],
+		$path,
+		$error['line'],
+		$indent,
+		$error['message']
+	);
+}
+
+function print_custom($error) {
+	global $colors, $color_map, $indent;
+	colorf("%s%sCustom Message: KEY              VALUE",
+		$colors['magenta_bold'],
+		$indent
+	);
+	foreach ($error as $k => $v) {
+		colorf("%s%s%s%-16s %s",
+			$colors['magenta_bold'],
+			$indent,
+			str_repeat(' ', strlen("Custom Message: ")),
+			$k,
+			$v
+		);
 	}
 }
