@@ -1,32 +1,46 @@
 #!/usr/bin/awk -f
+#
+# Expects a proc status file from /proc/<pid>/status
+#
+# USAGE: gather_memstat /proc/`pidof firefox-bin`/status
+#
 BEGIN {
-	DB = "sqlite3 ~/docs/stats/memstats.sqlite"
-	CREATE = "CREATE TABLE IF NOT EXISTS memstats ("
-	CREATE = CREATE "id     INTEGER PRIMARY KEY AUTOINCREMENT,"
-	CREATE = CREATE "Name   TEXT,"
-	CREATE = CREATE "VmPeak INT,"
-	CREATE = CREATE "VmSize INT,"
-	CREATE = CREATE "VmLck  INT,"
-	CREATE = CREATE "VmPin  INT,"
-	CREATE = CREATE "VmHWM  INT,"
-	CREATE = CREATE "VmRSS  INT,"
-	CREATE = CREATE "VmData INT,"
-	CREATE = CREATE "VmStk  INT,"
-	CREATE = CREATE "VmExe  INT,"
-	CREATE = CREATE "VmLib  INT,"
-	CREATE = CREATE "VmPTE  INT,"
-	CREATE = CREATE "VmSwap INT,"
-	CREATE = CREATE "added  TEXT DEFAULT (datetime('now', 'localtime'))"
-	CREATE = CREATE ");"
-	system(DB " \"" CREATE "\"")
+	DBFILE = "~/docs/stats/memstats.sqlite"
+	DBCMD = "sqlite3 " DBFILE
+	# Rebuild database table if it doesn't exist
+	if (system("[ -f " DBFILE " ]") > 0) {
+		CREATE = "CREATE TABLE IF NOT EXISTS memstats ("
+		CREATE = CREATE "id     INTEGER PRIMARY KEY AUTOINCREMENT,"
+		CREATE = CREATE "Name   TEXT,"
+		CREATE = CREATE "VmPeak INT,"
+		CREATE = CREATE "VmSize INT,"
+		CREATE = CREATE "VmLck  INT,"
+		CREATE = CREATE "VmPin  INT,"
+		CREATE = CREATE "VmHWM  INT,"
+		CREATE = CREATE "VmRSS  INT,"
+		CREATE = CREATE "VmData INT,"
+		CREATE = CREATE "VmStk  INT,"
+		CREATE = CREATE "VmExe  INT,"
+		CREATE = CREATE "VmLib  INT,"
+		CREATE = CREATE "VmPTE  INT,"
+		CREATE = CREATE "VmSwap INT,"
+		CREATE = CREATE "added  TEXT DEFAULT (datetime('now', 'localtime'))"
+		CREATE = CREATE ");"
+		system(DBCMD " \"" CREATE "\"")
+	}
 }
 
 END {
 	sub(/, $/, "", COLUMNS)
 	sub(/, $/, "", VALUES)
 	INSERT = "INSERT INTO memstats (" COLUMNS ") VALUES (" VALUES ");"
-	print INSERT
-	system(DB " \"" INSERT "\"")
+	# Push data into table, loop with a sleep to overcome "Database is locked"
+	# errors.
+	RET = 1
+	while (RET > 0) {
+		RET = system(DBCMD " \"" INSERT "\"")
+		system("sleep 0.2")
+	}
 }
 
 /^Vm|^Name/ {
