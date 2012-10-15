@@ -4,6 +4,8 @@
 #
 # USAGE: gather_memstat /proc/`pidof firefox-bin`/status
 #
+# CRONJOB: */5    *    *    *    *    pidof firefox-bin > /dev/null && ~/bin/gather_memstat /proc/`pidof firefox-bin`/status &>/dev/null
+#
 BEGIN {
 	DBFILE = "~/docs/stats/memstats.sqlite"
 	DBCMD = "sqlite3 " DBFILE
