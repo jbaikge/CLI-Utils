@@ -1,0 +1,36 @@
+#!/usr/bin/awk -f
+BEGIN {
+	DB = "sqlite3 ~/docs/stats/memstats.sqlite"
+	CREATE = "CREATE TABLE IF NOT EXISTS memstats ("
+	CREATE = CREATE "id     INTEGER PRIMARY KEY AUTOINCREMENT,"
+	CREATE = CREATE "Name   TEXT,"
+	CREATE = CREATE "VmPeak INT,"
+	CREATE = CREATE "VmSize INT,"
+	CREATE = CREATE "VmLck  INT,"
+	CREATE = CREATE "VmPin  INT,"
+	CREATE = CREATE "VmHWM  INT,"
+	CREATE = CREATE "VmRSS  INT,"
+	CREATE = CREATE "VmData INT,"
+	CREATE = CREATE "VmStk  INT,"
+	CREATE = CREATE "VmExe  INT,"
+	CREATE = CREATE "VmLib  INT,"
+	CREATE = CREATE "VmPTE  INT,"
+	CREATE = CREATE "VmSwap INT,"
+	CREATE = CREATE "added  TEXT DEFAULT (datetime('now', 'localtime'))"
+	CREATE = CREATE ");"
+	system(DB " \"" CREATE "\"")
+}
+
+END {
+	sub(/, $/, "", COLUMNS)
+	sub(/, $/, "", VALUES)
+	INSERT = "INSERT INTO memstats (" COLUMNS ") VALUES (" VALUES ");"
+	print INSERT
+	system(DB " \"" INSERT "\"")
+}
+
+/^Vm|^Name/ {
+	sub(/:/, "")
+	COLUMNS = COLUMNS $1 ", "
+	VALUES  = VALUES  "'" $2 "', "
+}
